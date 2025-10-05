@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>Rust + WASM</h1>
+    <pre id="out"></pre>
+    <script type="module">
+      console.log("Hello");
+
+      import init, { greet } from "./pkg/sonar_web_wasm.js";
+      await init(); // loads the .wasm
+      document.getElementById("out").textContent = greet("Fuck");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "portable-react-app",
+  "version": "1.0.0",
+  "description": "Portable React Application",
+  "scripts": {
+    "start": "serve -s build -p 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}
