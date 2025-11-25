@@ -1,11 +1,16 @@
-# Sonar Presence
+# Soundless Sonar
 
-Low-latency **acoustic presence detection** and **music segment pre-scanning** for Windows.  
-Three modes:
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE_APACHE)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-lightgrey.svg)](https://www.microsoft.com/windows)
 
-- **Presence** — Estimates whether a person is in front of the device by correlating **render (loopback)** with **microphone** to detect near-field echoes. Writes state changes to CSV and a rolling log.
-- **Scan** — Captures **system output only** (WASAPI loopback) while you play audio (e.g., YouTube), ranks “sonar-friendly” segments, and appends them to a CSV.
-- **Offline** — Analyzes a local audio file (wav/mp3/mp4/m4a) directly without playback; writes top segments to CSV.
+Low-latency **acoustic presence detection** and **music segment pre-scanning** for Windows.
+
+## Features
+
+- **Presence Detection** — Estimates whether a person is in front of the device by correlating render (loopback) with microphone to detect near-field echoes. Writes state changes to CSV and a rolling log.
+- **Scan Mode** — Captures system output only (WASAPI loopback) while you play audio (e.g., YouTube), ranks "sonar-friendly" segments, and appends them to a CSV.
+- **Offline Mode** — Analyzes a local audio file (WAV/MP3/MP4/M4A/FLAC/MKV) directly without playback; writes top segments to CSV.
 
 ---
 
@@ -14,11 +19,11 @@ Three modes:
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Platforms & Requirements](#platforms--requirements)
-- [Offline Mode — Supported Audio Formats](#offline-mode--supported-audio-formats)
+- [Supported Audio Formats](#supported-audio-formats)
 - [Modes & How They Work](#modes--how-they-work)
 - [Command Line Usage](#command-line-usage)
-- [Outputs (CSV & Logs)](#outputs-csv--logs)
-- [Keep Your Output Mix Clean (Scan Mode)](#keep-your-output-mix-clean-scan-mode)
+- [Output Files](#output-files)
+- [Keep Your Output Mix Clean](#keep-your-output-mix-clean)
 - [Tips & Best Practices](#tips--best-practices)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
@@ -26,7 +31,6 @@ Three modes:
 - [License](#license)
 
 ---
-to run the already build zip you need c++ 2015 redistributable 
 
 ## Quick Start
 
@@ -44,114 +48,115 @@ target/release/sonar-presence --mode scan --scan-url https://www.youtube.com/wat
 target/release/sonar-presence --mode offline --input "C:\music\track.mp3"
 ```
 
-> **Tip (Windows)**: Set **Playback sample rate to 48,000 Hz** (Sound settings → your output device → Advanced) for accurate Scan timestamps.
+> **Tip (Windows)**: Set **Playback sample rate to 48,000 Hz** (Sound settings > your output device > Advanced) for accurate Scan timestamps.
+
+> **Note**: To run the pre-built zip, you need C++ 2015 redistributable installed.
 
 ---
 
 ## Installation
 
-- Requires **Rust (edition 2021)** and a stable toolchain.
-- Build in release for real-time audio:
-  ```bash
-  cargo build --release
-  ```
-  Release profile is tuned for small, LTO’d binaries:
-  ```toml
-  [profile.release]
-  opt-level = "s"
-  lto = true
-  codegen-units = 1
-  ```
+### Prerequisites
+
+- **Rust** (edition 2021) with a stable toolchain
+- **Windows 10/11** for full functionality
+- **C++ 2015 Redistributable** (for pre-built binaries)
+
+### Building from Source
+
+```bash
+cargo build --release
+```
+
+The release profile is tuned for optimized binaries:
+
+```toml
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+```
 
 ---
 
 ## Platforms & Requirements
 
-- **Windows 10/11**: Full functionality (Presence + Scan + Offline).
-  - Scan and loopback capture rely on **WASAPI loopback** via the Windows SDK (`windows` crate).
-- **Non-Windows**:
-  - **Offline** mode works (file decoding via **symphonia**).
-  - **Presence** and **Scan** require loopback capture; the WASAPI module isn’t available and returns a clear error.
+| Platform | Presence | Scan | Offline |
+|----------|----------|------|---------|
+| Windows 10/11 | Full | Full | Full |
+| Linux/macOS | N/A | N/A | Full |
 
-Hardware:
+- **Windows**: Full functionality using WASAPI loopback via the Windows SDK
+- **Non-Windows**: Only Offline mode works (file decoding via symphonia)
 
-- A **microphone** and **speakers/headphones** for Presence.
-- For Scan, **only system output** is captured (mic should _not_ be mixed into output).
+### Hardware Requirements
+
+- **Microphone** and **speakers/headphones** for Presence mode
+- For Scan mode, only system output is captured (mic should *not* be mixed into output)
 
 ---
 
-## Offline Mode — Supported Audio Formats
+## Supported Audio Formats
 
-The **Offline** scanner decodes local files using the bundled `symphonia` decoders enabled in this project (`mkv`, `isomp4`, `wav`, `mp3`, `aac`, `vorbis`, `flac`).
+| Container | Extensions | Supported Codecs | Notes |
+|-----------|------------|------------------|-------|
+| **WAVE** | `.wav` | PCM / IEEE Float | Uncompressed LPCM (16/24/32-bit) |
+| **MP3** | `.mp3` | MP3 | Elementary MP3 streams |
+| **MP4/M4A** | `.mp4`, `.m4a` | AAC | Preferred container for AAC |
+| **FLAC** | `.flac` | FLAC | Lossless FLAC files |
+| **Matroska** | `.mkv` | Vorbis, FLAC, MP3 | Depends on embedded codec |
 
-| Container                | Common extensions | Supported codec(s) (enabled) | Notes                                                                                                    |
-| ------------------------ | ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **WAVE**                 | `.wav`            | PCM / IEEE Float             | Uncompressed LPCM (16/24/32-bit) and Float in WAV.                                                       |
-| **MP3**                  | `.mp3`            | MP3                          | Elementary MP3 streams.                                                                                  |
-| **MP4 / M4A** (ISO-BMFF) | `.mp4`, `.m4a`    | AAC                          | Preferred container for AAC audio.                                                                       |
-| **FLAC**                 | `.flac`           | FLAC                         | Lossless FLAC files.                                                                                     |
-| **Matroska**             | `.mkv`            | Vorbis, FLAC, MP3†           | Decodes tracks for which a corresponding enabled decoder exists. †Support depends on the embedded codec. |
-
-> **Not enabled** in this build: Ogg container (`.ogg`), Opus, ALAC, AIFF, WMA, DRM/protected media.  
-> **Raw AAC (`.aac`, ADTS)** may not be recognized reliably—use **`.m4a`/`.mp4`** when possible.
-
-**Decoding behavior (Offline):**
-
-- Only the **first (default) audio track** is used.
-- Audio is downmixed by taking the **first channel only** (mono analysis).
-- The file’s **native sample rate** is used for analysis as-is.
+> **Note**: Ogg container (`.ogg`), Opus, ALAC, AIFF, and WMA are not enabled. Raw AAC (`.aac`, ADTS) may not be recognized reliably—use `.m4a`/`.mp4` instead.
 
 ---
 
 ## Modes & How They Work
 
-### Presence (ref↔mic correlation + sliding aggregator)
+### Presence Mode
 
-- Captures:
-  - **Reference**: Default render device via **WASAPI loopback** (output you’re playing).
-  - **Mic**: Default input via **CPAL** (prefers 48 kHz if supported).
-- Processing:
-  - DC removal, simple pre-emphasis, L2 normalization.
-  - Normalized cross-correlation over lags: detect **direct path** and search the **echo band** corresponding to ~**0.3–1.5 m**.
-  - A robust **prominence score** (echo vs local percentiles) acts as “strength”.
-  - Converts lag to **distance** using speed of sound and halves for round-trip.
-- Decision:
-  - Per-tick votes are fed to a **sliding window aggregator** with **hysteresis**:
-    - Enter at **62%** agreement, exit at **38%**, **min dwell 1.5 s** to avoid flapping.
-- Output:
-  - On state flips, appends a row to `Detection.csv` with timestamp, presence, average distance, strength, and agreement %.
-  - Verbose lines go to `Detection.log`.
+Detects human presence by analyzing acoustic echoes:
 
-### Scan (render-only)
+1. **Captures** reference audio via WASAPI loopback and microphone input via CPAL
+2. **Processes** with DC removal, pre-emphasis, and L2 normalization
+3. **Correlates** to detect echoes in the **0.3–1.5m** range
+4. **Decides** using a sliding window aggregator with hysteresis (enter at 62%, exit at 38%, min dwell 1.5s)
+5. **Outputs** state changes to `Detection.csv` with timestamp, presence, distance, strength, and agreement %
 
-- Records **loopback** while you play audio on the PC; press **Ctrl+C** to analyze.
-- Feature pipeline (3 s windows by default, strided):
-  - STFT magnitudes → features: **spectral flux**, **flatness**, **crest (dB)**, **95% rolloff bandwidth**, **HF ratio**, **dynamic range**, **tonality (1-flatness)**, **loudness (dBFS)**.
-  - Robust **median/MAD z-scoring** and weighted sum → **score**.
-  - Percentile threshold + **NMS** + **merge** + **duration clamp** → top segments.
-- Output:
-  - Appends rows to `SongScan.csv`; can tag with `--scan-url`.
+### Scan Mode
 
-### Offline (file-based scan)
+Analyzes audio for "sonar-friendly" segments:
 
-- Decodes the first channel of a local **WAV/MP3/MP4/M4A/FLAC/MKV** (per table above).
-- Runs the same **Scan** pipeline at the file’s native sample rate.
-- Tags rows with `--scan-url` if provided, else a `file://...` tag.
+1. Records loopback while you play audio; press **Ctrl+C** to analyze
+2. Extracts features: spectral flux, flatness, crest, rolloff bandwidth, HF ratio, dynamic range, tonality, loudness
+3. Applies robust median/MAD z-scoring and weighted sum scoring
+4. Uses percentile threshold + NMS + merge + duration clamp to find top segments
+5. Outputs results to `SongScan.csv`
+
+### Offline Mode
+
+Same as Scan but operates on local files:
+
+- Decodes the first channel of local audio files
+- Runs the same feature pipeline at the file's native sample rate
+- Tags results with `--scan-url` or generates a `file://...` tag
 
 ---
 
 ## Command Line Usage
 
-```text
+```
 --mode presence|scan|offline    # default: presence
+
 # General paths
---log-path <PATH>               # Detection.log (default points to a Windows path)
---scansong-path <PATH>          # SongScan.csv (default: sibling next to log)
-# Presence
+--log-path <PATH>               # Detection.log location
+--scansong-path <PATH>          # SongScan.csv location
+
+# Presence options
 -tm, --tick-ms <MS>             # analyzer tick (default: 250)
 -af, --agg-frac <FRAC>          # window agreement threshold [0..1] (default: 0.50)
 -ws, --window-sec <SEC>         # sliding window length (default: 3)
-# Scan/Offline (feature/scoring)
+
+# Scan/Offline options
 --frame-ms <MS>                 # STFT frame size (default: 23)
 --scan-window-s <SEC>           # analysis window (default: 3.0)
 --stride-ms <MS>                # window stride (default: 200)
@@ -162,15 +167,16 @@ The **Offline** scanner decodes local files using the bundled `symphonia` decode
 --merge-gap-s <SEC>             # merge gap (default: 3.0)
 --clamp-min-s <SEC>             # min segment length (default: 3.0)
 --clamp-max-s <SEC>             # max segment length (default: 60.0)
---scan-url <URL>                # tag rows (e.g., the YouTube URL)
---input <PATH>                  # required in --mode offline
+--scan-url <URL>                # tag rows (e.g., YouTube URL)
+--input <PATH>                  # required for offline mode
+
 -h, --help
 ```
 
-**Examples**
+### Examples
 
 ```bash
-# Presence, slightly faster ticks and tighter window
+# Presence with custom parameters
 sonar-presence --mode presence -tm 200 -af 0.60 -ws 3
 
 # Scan with URL tag
@@ -182,153 +188,180 @@ sonar-presence --mode offline --input "C:\music\track.mp3" --top-n 15
 
 ---
 
-## Outputs (CSV & Logs)
+## Output Files
 
-### `Detection.csv` (written next to `--log-path`)
+### Detection.csv (Presence Mode)
 
-Header:
-
-```
+```csv
 timestamp,present,avg_distance_m,avg_strength,agree_pct
 ```
 
-- **timestamp**: Local time when state flips.
-- **present**: `true`/`false` after hysteresis + dwell.
-- **avg_distance_m**: Mean estimated person distance across the window (∞ when not present).
-- **avg_strength**: Mean echo prominence (0–1).
-- **agree_pct**: % of valid votes asserting presence in the window.
+| Column | Description |
+|--------|-------------|
+| `timestamp` | Local time when state flips |
+| `present` | `true`/`false` after hysteresis |
+| `avg_distance_m` | Mean estimated distance (infinity when not present) |
+| `avg_strength` | Mean echo prominence (0–1) |
+| `agree_pct` | % of votes asserting presence |
 
-### `SongScan.csv`
+### SongScan.csv (Scan/Offline Mode)
 
-Header:
-
-```
+```csv
 url,start_s,end_s,score,frame_ms,window_s,stride_s,bandwidth_z,flatness_z,flux_z,crest_db,hf_ratio,dynrange_z,tonality_z,loudness_dbfs,notes
 ```
 
-- **url**: Tag from `--scan-url` or `file://…` in Offline mode.
-- **start_s / end_s**: Segment bounds (may be clamped to min/max).
-- **score**: Weighted feature score (higher is better).
-- **frame_ms / window_s / stride_s**: Analysis parameters used.
-- **bandwidth_z, flatness_z, flux_z, dynrange_z, tonality_z**: Median/MAD z-scores.
-- **crest_db**: 75th-percentile frame crest within window.
-- **hf_ratio**: HF energy / total.
-- **loudness_dbfs**: Median RMS (dBFS).
-- **notes**: Reserved.
+### Detection.log
 
-### Logs
-
-- **Default log path**: `Detection.log` (overridable with `--log-path`).
-- Contains device info, timing, and per-tick summaries during Presence.
+Contains device info, timing, and per-tick summaries during Presence mode.
 
 ---
 
-## Keep Your Output Mix Clean (Scan Mode)
+## Keep Your Output Mix Clean
 
-> Ensure your **output mix is clean (no microphone)** so Scan mode works as intended (WASAPI loopback captures _only_ system output).
+For Scan mode to work correctly, ensure your output mix is clean (no microphone):
 
-### TL;DR — Turn These Off
+### Disable These Settings
 
-- [ ] Windows **“Listen to this device”** on your microphone
-- [ ] **Direct monitoring** of the mic via interface/DAW/OBS
-- [ ] **Virtual devices** (Stereo Mix / “What U Hear” / virtual cables) that route mic → output
+- Windows **"Listen to this device"** on your microphone
+- **Direct monitoring** via audio interface/DAW/OBS
+- **Virtual devices** (Stereo Mix / virtual cables) routing mic to output
 
-If any of these are enabled, room sound (talking, claps) will leak into the loopback capture.
+### Quick Test
 
-### Why It Matters
-
-- **Scan mode** records **render/output** only. If your system mixes the mic into output, scans will reflect the room.
-- **Presence mode** _does_ use the mic; the checklist above is **about Scan**, not Presence.
-
-### Disable Common Mic→Output Paths
-
-**Windows: “Listen to this device”**
-
-1. Speaker icon → **Sound settings**
-2. **More sound settings** → **Recording** → **Microphone → Properties**
-3. **Listen** tab → **Uncheck** _Listen to this device_ → **OK**
-   - Ensure **Playback through this device** is **not** your speakers.
-
-**Audio Interface**
-
-- Turn **Direct Monitor** **Off**, or set the **mix** knob to **Playback/PC** only.
-- In vendor mixers (Focusrite/MOTU/RME), **mute** mic channels feeding the monitor bus.
-
-**DAW (Ableton/FL/Reaper/Logic)**
-
-- On the mic track, set **Monitoring = Off**; ensure no sends/returns route mic → Master during scans.
-
-**OBS**
-
-- **Settings → Audio** or **Advanced Audio Properties**: set **Mic/Aux → Audio Monitoring = Monitor Off**.
-- Don’t mix mic into **Desktop Audio** or **Audio Output Capture** that hits your OS output.
-
-**Virtual Devices**
-
-- Disable **Stereo Mix / What U Hear**; don’t set them as Default.
-- For virtual cables, ensure the mic isn’t routed to your default Playback device; mute it if unsure.
-
-### 2-Minute Self-Test
-
-1. Play a song on the PC.
-2. **Speak/clap** loudly.
-3. Run **Scan** and analyze. If your voice/claps change results, mic leakage still exists.
+1. Play a song on your PC
+2. Speak or clap loudly
+3. Run Scan and analyze—if your voice/claps appear in results, mic leakage exists
 
 ---
 
 ## Tips & Best Practices
 
-- **Sample rate**: Presence will prefer 48 kHz for the mic if supported; set your **Playback device to 48 kHz** for tighter Scan timestamps.
-- **Quiet rooms**: Presence uses RMS gates to avoid false work when both streams are silent.
-- **Front distance band**: Presence focuses on ~**0.3–1.5 m** echoes after the direct path.
-- **Latency budget**: Accounts for up to **200 ms** render→mic device latency before searching for echoes.
-- **Stopping**: Press **Ctrl+C** in Scan/Offline to finalize analysis and write CSV rows.
+- **Sample Rate**: Set playback device to 48 kHz for accurate timestamps
+- **Quiet Rooms**: Presence uses RMS gates to avoid false positives in silence
+- **Detection Range**: Presence focuses on ~0.3–1.5m echoes
+- **Latency Budget**: Accounts for up to 200ms render-to-mic device latency
+- **Stopping**: Press Ctrl+C in Scan/Offline to finalize analysis
 
 ---
 
 ## Troubleshooting
 
-- **“No default input device (microphone) found”**  
-  Plug in a mic or set a default input (Windows Sound → Recording).
-
-- **Presence never flips to true**  
-  Ensure the render output is audible (or disable any output device muting). The presence estimator needs _both_ a reference signal and a mic pickup of its echo.
-
-- **Scan shows room sounds**  
-  Revisit the **Clean Output Mix** checklist; something is mixing mic → output.
-
-- **“IAudioClient Initialize failed” or loopback device errors**  
-  Close apps that may be holding exclusive control. In device **Properties → Advanced**, consider disabling **exclusive mode**.
-
-- **WASAPI loopback on non-Windows**  
-  Not supported. Use **Offline** mode to analyze files.
+| Issue | Solution |
+|-------|----------|
+| "No default input device found" | Plug in a mic or set a default input in Windows Sound settings |
+| Presence never detects | Ensure render output is audible; both reference signal and mic pickup are required |
+| Scan shows room sounds | Check the Clean Output Mix section above |
+| "IAudioClient Initialize failed" | Close apps with exclusive audio control; disable exclusive mode in device properties |
+| WASAPI on non-Windows | Not supported; use Offline mode instead |
 
 ---
 
 ## FAQ
 
-**Does the app emit sound?**  
-By default, no. There’s a tiny optional **18 kHz probe tone** (disabled in code) meant to keep loopback “alive” if needed.
+**Does the app emit sound?**
+By default, no. There's an optional 18 kHz probe tone (disabled) to keep loopback active if needed.
 
-**What distances does it report?**  
-Presence clamps reported distance to **≤ 1.5 m**; strength is a normalized echo prominence (0–1).
+**What distances does it report?**
+Presence clamps distance to ≤1.5m; strength is normalized echo prominence (0–1).
 
-**Why do Presence CSV rows only appear occasionally?**  
-Rows are written **on state changes** (after hysteresis + dwell), not every tick.
+**Why do Presence CSV rows appear infrequently?**
+Rows are written only on state changes (after hysteresis + dwell), not every tick.
 
-**Can I tag Scan results with a source?**  
-Yes, use `--scan-url`, which becomes the `url` column; Offline mode tags with `file://...` if no URL is given.
+**Can I tag Scan results with a source?**
+Yes, use `--scan-url`. Offline mode uses `file://...` if no URL is provided.
 
 ---
 
 ## Privacy
 
-- All analysis is **local**.
-- Files written: `Detection.log`, `Detection.csv`, and `SongScan.csv` at paths you control.
-- No network activity or telemetry is performed.
+- All analysis is performed **locally**
+- Files written: `Detection.log`, `Detection.csv`, `SongScan.csv` at paths you control
+- **No network activity or telemetry**
 
 ---
 
 ## License
 
-(Apache-2.0).
+This project is licensed under the **Apache License 2.0** - see [LICENSE_APACHE](LICENSE_APACHE) for details.
+
+### Third-Party Licenses
+
+This project uses the following third-party libraries:
+
+#### Direct Dependencies
+
+| Crate | License | Description |
+|-------|---------|-------------|
+| [cpal](https://github.com/RustAudio/cpal) (0.15) | Apache-2.0 | Cross-platform audio I/O library |
+| [anyhow](https://github.com/dtolnay/anyhow) (1.0) | MIT OR Apache-2.0 | Flexible concrete Error type |
+| [rustfft](https://github.com/ejmahler/RustFFT) (6.1) | MIT OR Apache-2.0 | High-performance FFT library |
+| [ndarray](https://github.com/rust-ndarray/ndarray) (0.15) | MIT OR Apache-2.0 | N-dimensional array library |
+| [ndarray-stats](https://github.com/rust-ndarray/ndarray-stats) (0.5) | MIT OR Apache-2.0 | Statistical routines for ndarray |
+| [plotters](https://github.com/plotters-rs/plotters) (0.3) | MIT | Data visualization library |
+| [ctrlc](https://github.com/Detegr/rust-ctrlc) (3.2) | MIT OR Apache-2.0 | Ctrl-C handler |
+| [serde](https://github.com/serde-rs/serde) (1.0) | MIT OR Apache-2.0 | Serialization framework |
+| [serde_json](https://github.com/serde-rs/json) (1.0) | MIT OR Apache-2.0 | JSON serialization |
+| [hound](https://github.com/ruuda/hound) (3.5) | Apache-2.0 | WAV encoding/decoding library |
+| [chrono](https://github.com/chronotope/chrono) (0.4) | MIT OR Apache-2.0 | Date and time library |
+
+#### Notable Transitive Dependencies
+
+| Crate | License | Description |
+|-------|---------|-------------|
+| num-complex | MIT OR Apache-2.0 | Complex numbers |
+| num-traits | MIT OR Apache-2.0 | Numeric traits |
+| num-integer | MIT OR Apache-2.0 | Integer traits and functions |
+| image | MIT | Image processing library |
+| png | MIT OR Apache-2.0 | PNG image format support |
+| gif | MIT OR Apache-2.0 | GIF image format support |
+| font-kit | MIT OR Apache-2.0 | Font loading library |
+| libc | MIT OR Apache-2.0 | Raw FFI bindings to platform libraries |
+| proc-macro2 | MIT OR Apache-2.0 | Procedural macro support |
+| syn | MIT OR Apache-2.0 | Rust syntax parsing |
+| quote | MIT OR Apache-2.0 | Quasi-quoting for proc macros |
+| byteorder | MIT OR Unlicense | Reading/writing numbers in big/little endian |
+| cfg-if | MIT OR Apache-2.0 | Compile-time conditional configuration |
+| lazy_static | MIT OR Apache-2.0 | Lazy static initialization |
+| once_cell | MIT OR Apache-2.0 | Single assignment cells |
+| thiserror | MIT OR Apache-2.0 | Derive macro for std::error::Error |
+| walkdir | MIT OR Unlicense | Recursive directory walking |
+| regex | MIT OR Apache-2.0 | Regular expressions |
+| memchr | MIT OR Unlicense | Optimized string searching |
+| rand | MIT OR Apache-2.0 | Random number generation |
+| flate2 | MIT OR Apache-2.0 | DEFLATE compression |
+| crc32fast | MIT OR Apache-2.0 | Fast CRC32 checksums |
+| itertools | MIT OR Apache-2.0 | Extra iterator adaptors |
+| indexmap | MIT OR Apache-2.0 | Hash table with consistent ordering |
+| log | MIT OR Apache-2.0 | Lightweight logging facade |
+
+#### Platform-Specific Dependencies
+
+**Windows**
+| Crate | License |
+|-------|---------|
+| windows, windows-sys, winapi | MIT OR Apache-2.0 |
+| dwrote | MPL-2.0 |
+
+**macOS**
+| Crate | License |
+|-------|---------|
+| core-foundation, core-graphics, core-text, coreaudio-rs | MIT OR Apache-2.0 |
+| mach2 | BSD-2-Clause |
+
+**Linux**
+| Crate | License |
+|-------|---------|
+| alsa, alsa-sys | MIT OR Apache-2.0 |
+| fontconfig-sys | MIT |
+| freetype-sys | MIT |
+
+**Android**
+| Crate | License |
+|-------|---------|
+| ndk, ndk-sys, oboe | MIT OR Apache-2.0 |
+| jni | MIT OR Apache-2.0 |
+
+**WebAssembly**
+| Crate | License |
+|-------|---------|
+| wasm-bindgen, web-sys, js-sys | MIT OR Apache-2.0 |
