@@ -53,7 +53,8 @@ target/release/sonar-presence --mode offline --input "C:\music\track.mp3"
 > **Note**: To run the pre-built zip, you need C++ 2015 redistributable installed.
 
 ---
-
+**Video Tutorial**  
+[![Video Tutorial](https://img.youtube.com/vi/s60cDCLDJ3E/0.jpg)](https://www.youtube.com/watch?v=s60cDCLDJ3E)
 ## Installation
 
 ### Prerequisites
